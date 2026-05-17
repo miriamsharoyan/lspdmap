@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LSPD</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Arial', serif;
+      background: #003566;
+      color: #003566;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      border-bottom: 1px solid #3a3020;
+      background: #1a1510;
+      z-index: 1000;
+    }
+
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: normal;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #c8b87a;
+    }
+
+    header span {
+      font-size: 0.78rem;
+      color: #6b6050;
+      letter-spacing: 0.04em;
+    }
+
+    #map {
+      flex: 1;
+      background: #1a1510;
+    }
+
+    .leaflet-container {
+      background: #1a1510;
+    }
+
+    .leaflet-control-zoom a {
+      background: #2a2018 !important;
+      color: #c8b87a !important;
+      border-color: #3a3020 !important;
+    }
+
+    .leaflet-control-zoom a:hover {
+      background: #3a3020 !important;
+    }
+
+    .leaflet-control-attribution {
+      background: rgba(26, 21, 16, 0.8) !important;
+      color: #6b6050 !important;
+      font-size: 10px;
+    }
+
+    .leaflet-control-attribution a {
+      color: #8a7850 !important;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>LSPD</h1>
+    <span>Scroll to zoom · drag to pan</span>
+  </header>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ── CONFIGURATION ──────────────────────────────────────────────
+    // 1. Put your map image (e.g. map.jpg or map.png) in the same
+    //    folder as this index.html file.
+    // 2. Set the filename below.
+    // 3. Set the natural pixel dimensions of your image.
+    const IMAGE_FILE   = 'mapls.png';   // ← your image filename
+    const IMAGE_WIDTH  = 8192;        // ← your image width in pixels
+    const IMAGE_HEIGHT = 12288;        // ← your image height in pixels
+    // ──────────────────────────────────────────────────────────────
+
+    const map = L.map('map', {
+      crs: L.CRS.Simple,
+      minZoom: -3,
+      maxZoom: 3,
+      zoomSnap: 0.25,
+    });
+
+    const bounds = [[0, 0], [IMAGE_HEIGHT, IMAGE_WIDTH]];
+
+    L.imageOverlay(IMAGE_FILE, bounds).addTo(map);
+
+    map.fitBounds(bounds);
+    map.setMaxBounds(bounds.map(([y, x]) => [y * 1.2, x * 1.2]));
+  </script>
+
+</body>
+</html>
