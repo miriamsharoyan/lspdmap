@@ -9,7 +9,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Georgia', serif;
+      font-family: 'Arial', bold;
       background: #1a1510;
       color: #e8dfc8;
       height: 100vh;
@@ -23,7 +23,7 @@
       align-items: center;
       gap: 1.5rem;
       border-bottom: 1px solid #3a3020;
-      background: #1a1510;
+      background: #aec1c7;
       z-index: 1000;
       flex-wrap: wrap;
     }
@@ -33,7 +33,7 @@
       font-weight: normal;
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: #c8b87a;
+      color: #003566;
       white-space: nowrap;
     }
 
@@ -45,9 +45,9 @@
     }
 
     .tool-btn {
-      width: 36px;
-      height: 36px;
-      background: #2a2018;
+      width: 24px;
+      height: 24px;
+      background: #aec1c7;
       border: 1px solid #3a3020;
       border-radius: 6px;
       cursor: pointer;
@@ -57,11 +57,11 @@
       transition: background 0.15s, border-color 0.15s;
     }
 
-    .tool-btn:hover { background: #3a3020; }
+    .tool-btn:hover { background: #3f6e7d; }
 
     .tool-btn.active {
-      border-color: #c8b87a;
-      background: #3a2e10;
+      border-color: #f95738;
+      background: #f77f00;
     }
 
     .tool-btn svg { width: 20px; height: 20px; }
@@ -126,12 +126,25 @@
       border-radius: 4px;
       white-space: nowrap;
     }
+
+    .region-label {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      color: #003566;
+      font-family: 'Arial', sans-serif;
+      font-size: 13px;
+      font-weight: bold;
+      text-shadow: 0 1px 3px rgba(255,255,255,0.6);
+      white-space: nowrap;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>The Map</h1>
+    <h1>LSPD</h1>
 
     <div id="toolbar">
       <button class="tool-btn active" data-shape="pin" title="Pin">
@@ -155,6 +168,15 @@
 
       <div class="divider"></div>
 
+      <!-- region tool -->
+      <button class="tool-btn" id="region-btn" title="Draw a region (drag to highlight an area)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 2"/>
+        </svg>
+      </button>
+
+      <div class="divider"></div>
+
       <div id="color-picker">
         <div class="color-dot active" data-color="#c0392b" style="background:#c0392b" title="Red"></div>
         <div class="color-dot" data-color="#c8b87a" style="background:#c8b87a" title="Gold"></div>
@@ -165,7 +187,7 @@
 
       <div class="divider"></div>
 
-      <button class="tool-btn" id="delete-btn" title="Delete mode — click a marker to remove it">
+      <button class="tool-btn" id="delete-btn" title="Delete mode — click a marker or region to remove it">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14H6L5,6"/><path d="M10,11v6M14,11v6"/><path d="M9,6V4h6v2"/></svg>
       </button>
     </div>
@@ -178,9 +200,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     // ── CONFIGURATION ──────────────────────────────────────────────
-    const IMAGE_FILE   = 'mapls.png';   // ← your image filename
-    const IMAGE_WIDTH  = 4950;        // ← your image width in pixels
-    const IMAGE_HEIGHT = 5023;        // ← your image height in pixels
+    const IMAGE_FILE   = 'mapls.png';
+    const IMAGE_WIDTH  = 4950;
+    const IMAGE_HEIGHT = 5023;
     // ──────────────────────────────────────────────────────────────
 
     const map = L.map('map', {
@@ -199,19 +221,33 @@
     let selectedShape = 'pin';
     let selectedColor = '#c0392b';
     let deleteMode = false;
+    let regionMode = false;
 
-    // ── TOOLBAR ───────────────────────────────────────────────────
+    // ── HELPERS ───────────────────────────────────────────────────
+    function setHint(text) { document.getElementById('hint').textContent = text; }
+
+    function clearModes() {
+      deleteMode = false;
+      regionMode = false;
+      document.getElementById('delete-btn').classList.remove('active');
+      document.getElementById('region-btn').classList.remove('active');
+      map.getContainer().classList.remove('placing');
+      map.dragging.enable();
+    }
+
+    // ── TOOLBAR: MARKER SHAPES ────────────────────────────────────
     document.querySelectorAll('.tool-btn[data-shape]').forEach(btn => {
       btn.addEventListener('click', () => {
+        clearModes();
         document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         selectedShape = btn.dataset.shape;
-        deleteMode = false;
         map.getContainer().classList.add('placing');
-        document.getElementById('hint').textContent = 'Click the map to place a marker · right-click marker to remove';
+        setHint('Click the map to place a marker · right-click marker to remove');
       });
     });
 
+    // ── TOOLBAR: COLORS ───────────────────────────────────────────
     document.querySelectorAll('.color-dot').forEach(dot => {
       dot.addEventListener('click', () => {
         document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
@@ -220,14 +256,34 @@
       });
     });
 
+    // ── TOOLBAR: REGION ───────────────────────────────────────────
+    document.getElementById('region-btn').addEventListener('click', () => {
+      const activate = !regionMode;
+      clearModes();
+      if (activate) {
+        regionMode = true;
+        document.getElementById('region-btn').classList.add('active');
+        document.querySelectorAll('.tool-btn[data-shape]').forEach(b => b.classList.remove('active'));
+        map.getContainer().classList.add('placing');
+        setHint('Drag on the map to draw a highlighted region · right-click region to remove');
+      } else {
+        setHint('Choose a shape · click the map to place · right-click marker to remove');
+      }
+    });
+
+    // ── TOOLBAR: DELETE ───────────────────────────────────────────
     document.getElementById('delete-btn').addEventListener('click', () => {
-      deleteMode = !deleteMode;
-      document.getElementById('delete-btn').classList.toggle('active', deleteMode);
-      document.querySelectorAll('.tool-btn[data-shape]').forEach(b => b.classList.remove('active'));
-      map.getContainer().classList.toggle('placing', deleteMode);
-      document.getElementById('hint').textContent = deleteMode
-        ? 'Click a marker to remove it'
-        : 'Choose a shape · click the map to place · right-click marker to remove';
+      const activate = !deleteMode;
+      clearModes();
+      if (activate) {
+        deleteMode = true;
+        document.getElementById('delete-btn').classList.add('active');
+        document.querySelectorAll('.tool-btn[data-shape]').forEach(b => b.classList.remove('active'));
+        map.getContainer().classList.add('placing');
+        setHint('Click a marker or region to remove it');
+      } else {
+        setHint('Choose a shape · click the map to place · right-click marker to remove');
+      }
     });
 
     // ── SVG ICON BUILDER ──────────────────────────────────────────
@@ -256,7 +312,7 @@
     map.getContainer().classList.add('placing');
 
     map.on('click', e => {
-      if (deleteMode) return;
+      if (deleteMode || regionMode) return;
       const label = prompt('Label for this marker (leave blank for none):');
       if (label === null) return;
       const marker = L.marker(e.latlng, { icon: makeIcon(selectedShape, selectedColor) }).addTo(map);
@@ -270,6 +326,87 @@
       }
       marker.on('contextmenu', () => map.removeLayer(marker));
       marker.on('click', () => { if (deleteMode) map.removeLayer(marker); });
+    });
+
+    // ── REGION DRAWING ───────────────────────────────────────────
+    let dragStart = null;
+    let previewRect = null;
+
+    map.on('mousedown', e => {
+      if (!regionMode) return;
+      dragStart = e.latlng;
+      map.dragging.disable();
+
+      const onMove = ev => {
+        if (!dragStart) return;
+        const cur = map.mouseEventToLatLng(ev.originalEvent);
+        const b = L.latLngBounds(dragStart, cur);
+        if (previewRect) map.removeLayer(previewRect);
+        previewRect = L.rectangle(b, {
+          color: selectedColor,
+          weight: 2,
+          opacity: 0.9,
+          fillColor: selectedColor,
+          fillOpacity: 0.15,
+          dashArray: '6 4',
+          interactive: false,
+        }).addTo(map);
+      };
+
+      const onUp = ev => {
+        map.off('mousemove', onMove);
+        map.off('mouseup', onUp);
+        map.dragging.enable();
+
+        if (!dragStart) return;
+        const end = map.mouseEventToLatLng(ev.originalEvent);
+        const b = L.latLngBounds(dragStart, end);
+        dragStart = null;
+
+        if (previewRect) { map.removeLayer(previewRect); previewRect = null; }
+
+        const size = map.latLngToContainerPoint(b.getNorthEast()).distanceTo(
+                     map.latLngToContainerPoint(b.getSouthWest()));
+        if (size < 10) return;
+
+        const label = prompt('Label for this region (leave blank for none):');
+        if (label === null) return;
+
+        const rect = L.rectangle(b, {
+          color: selectedColor,
+          weight: 2,
+          opacity: 0.85,
+          fillColor: selectedColor,
+          fillOpacity: 0.12,
+        }).addTo(map);
+
+        let labelMarker = null;
+        if (label.trim()) {
+          labelMarker = L.marker(b.getCenter(), {
+            icon: L.divIcon({ className: '', html: '', iconSize: [0, 0] })
+          }).addTo(map);
+          labelMarker.bindTooltip(label.trim(), {
+            permanent: true,
+            direction: 'center',
+            className: 'region-label',
+          }).openTooltip();
+        }
+
+        const removeRegion = () => {
+          map.removeLayer(rect);
+          if (labelMarker) map.removeLayer(labelMarker);
+        };
+
+        rect.on('contextmenu', removeRegion);
+        rect.on('click', () => { if (deleteMode) removeRegion(); });
+        if (labelMarker) {
+          labelMarker.on('contextmenu', removeRegion);
+          labelMarker.on('click', () => { if (deleteMode) removeRegion(); });
+        }
+      };
+
+      map.on('mousemove', onMove);
+      map.on('mouseup', onUp);
     });
   </script>
 
